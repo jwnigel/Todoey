@@ -7,19 +7,22 @@
 //
 
 import UIKit
+import CoreData
 
 class TodoListViewController: UITableViewController {
     
-    var itemArray = ["Study Swift", "Wash clothes", "Make Lunch", "Do dishes"]
+    var itemArray = [Item]()
     let defaults = UserDefaults.standard
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
 
     
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view.
-        if let items = defaults.array(forKey: "TodoListArray") as? [String] {
-            itemArray = items
-        }
+        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
+        
+        loadItems()
+        
     }
     
     //MARK - TableView Datasource methods
@@ -31,7 +34,11 @@ class TodoListViewController: UITableViewController {
         
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
         
-        cell.textLabel?.text = itemArray[indexPath.row]
+        let item = itemArray[indexPath.row]
+        
+        cell.textLabel?.text = item.title
+        
+        cell.accessoryType = item.done ? .checkmark : .none
         
         return cell
     }
@@ -40,13 +47,15 @@ class TodoListViewController: UITableViewController {
     
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-            
-        if tableView.cellForRow(at: indexPath)?.accessoryType == .checkmark {
-            tableView.cellForRow(at: indexPath)?.accessoryType = .none
-        } else {
-            tableView.cellForRow(at: indexPath)?.accessoryType = .checkmark
-        }
-
+        
+        // Remove / Delete to-do item by selecting
+//        context.delete(itemArray[indexPath.row])
+//        itemArray.remove(at: indexPath.row)
+  
+        itemArray[indexPath.row].done = !itemArray[indexPath.row].done
+        
+        saveItems()
+                
         tableView.deselectRow(at: indexPath, animated: true)
     }
     
@@ -61,11 +70,12 @@ class TodoListViewController: UITableViewController {
         let action = UIAlertAction(title: "Add item", style: .default) { (action) in
             // Triggered when user clicks "Add item"
             
-            self.itemArray.append(textField.text!)
+            let newItem = Item(context: self.context)
+            newItem.title = textField.text!
+            newItem.done = false
+            self.itemArray.append(newItem)
             
-            self.defaults.set(self.itemArray, forKey: "TodoListArray")
-            
-            self.tableView.reloadData()
+            self.saveItems()
         }
         
         alert.addTextField { (alertTextField) in
@@ -81,5 +91,29 @@ class TodoListViewController: UITableViewController {
 
     }
     
+    //MARK - Model Manipulation Methods
+    
+    func saveItems() {
+        
+        do {
+            try self.context.save()
+        } catch {
+            print("Error saving context: \n\(error)")
+        }
+                    
+        self.tableView.reloadData()
+    }
+    
+    
+    func loadItems() {
+        
+        let request: NSFetchRequest<Item> = Item.fetchRequest()
+        
+        do {
+            itemArray = try context.fetch(request)
+        } catch {
+            print("Error fetching request. \nError message: \n\(error)")
+        }
+    }
 }
 
